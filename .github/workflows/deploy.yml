@@ -1,0 +1,37 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: echo node-linker=hoisted > .npmrc
+      - run: pnpm install --frozen-lockfile
+      - name: Patch for GitHub Pages path
+        run: |
+          sed -i 's|typedRoutes: true,|typedRoutes: true, baseUrl: "/tahwelaty",|' app.config.ts
+          sed -i 's|"/icon-|"/tahwelaty/icon-|g; s|"start_url": "/"|"start_url": "/tahwelaty/"|; s|"scope": "/"|"scope": "/tahwelaty/"|' public/manifest.json
+          sed -i 's|href="/manifest.json"|href="/tahwelaty/manifest.json"|; s|href="/apple-touch-icon.png"|href="/tahwelaty/apple-touch-icon.png"|' "app/+html.tsx"
+      - run: npx expo export --platform web
+      - run: touch dist/.nojekyll && cp dist/index.html dist/404.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/deploy-pages@v4
