@@ -15,7 +15,8 @@ export type DemoTransaction = DemoAction & {
   status: "demo";
 };
 
-export const DEMO_BALANCE = 12450;
+/** Keep the demo balance at zero until a verified provider account is integrated. */
+export const DEMO_BALANCE = 0;
 
 export function maskSensitiveTarget(value: string): string {
   return value.replace(/[0-9٠-٩۰-۹]{4,}/gu, (sequence) => {

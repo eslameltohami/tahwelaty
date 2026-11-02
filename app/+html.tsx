@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ScrollViewStyleReset } from "expo-router/html";
+import { publicAssetPath } from "@/components/tahwelaty-web/paths";
 
 export default function Root({ children }: { children: ReactNode }) {
   return (
@@ -14,8 +15,8 @@ export default function Root({ children }: { children: ReactNode }) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="تحويلاتي" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <link rel="manifest" href="/manifest.webmanifest" />
-        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="manifest" href={publicAssetPath("manifest.webmanifest")} />
+        <link rel="apple-touch-icon" href={publicAssetPath("icons/apple-touch-icon.png")} />
         <title>TAHWELATY — تحويلاتي</title>
       </head>
       <body>

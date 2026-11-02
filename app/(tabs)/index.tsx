@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as LocalAuthentication from "expo-local-authentication";
-import { useEffect, useState } from "react";
+import * as Sharing from "expo-sharing";
+import { useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   Animated,
@@ -16,6 +17,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { captureRef, releaseCapture } from "react-native-view-shot";
 
 import {
   maskSensitiveTarget,
@@ -78,6 +80,8 @@ export default function HomeScreen() {
   const [pinError, setPinError] = useState("");
   const [pendingAction, setPendingAction] = useState<DemoAction | null>(null);
   const [receipt, setReceipt] = useState<DemoTransaction | null>(null);
+  const receiptImageRef = useRef<View>(null);
+  const [receiptShareBusy, setReceiptShareBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [biometricAvailability, setBiometricAvailability] = useState(
@@ -124,6 +128,30 @@ export default function HomeScreen() {
   }, [progress, pulse, reduceMotion]);
 
   const showNotice = (message: string) => setNotice(message);
+
+  const shareReceiptImage = async () => {
+    if (!receipt || !receiptImageRef.current || receiptShareBusy) return;
+    setReceiptShareBusy(true);
+    let imageUri: string | undefined;
+    try {
+      if (!(await Sharing.isAvailableAsync())) {
+        showNotice("مشاركة الصور غير متاحة على هذا الجهاز.");
+        return;
+      }
+      imageUri = await captureRef(receiptImageRef, { format: "png", quality: 1, result: "tmpfile" });
+      await Sharing.shareAsync(imageUri, {
+        mimeType: "image/png",
+        UTI: "public.png",
+        dialogTitle: "مشاركة إيصال محاكاة TAHWELATY",
+      });
+      showNotice("تم فتح قائمة مشاركة صورة إيصال تجريبي، غير صالح كإثبات دفع.");
+    } catch {
+      showNotice("تعذر تجهيز صورة الإيصال. لم تُرسل أموال أو بيانات لأي جهة.");
+    } finally {
+      if (imageUri) releaseCapture(imageUri);
+      setReceiptShareBusy(false);
+    }
+  };
 
   const navigate = (tab: TabId) => {
     if (tab === "pay") setPayMode("transfer");
@@ -361,20 +389,27 @@ export default function HomeScreen() {
         <View style={styles.modalBackdrop}>
           <ScrollView contentContainerStyle={styles.modalScroll}>
             <Panel style={styles.modalPanel}>
-              <View style={styles.receiptCheck}><Icon name="checkmark" color={palette.background} size={24} /></View>
-              <Pill tone="red">إيصال محاكاة — ليس إثبات دفع</Pill>
-              <Text accessibilityRole="header" style={styles.modalTitle}>لم يتم تنفيذ أي معاملة</Text>
-              <Text style={styles.modalCopy}>تم اختبار الواجهة محليًا فقط. لم تُرسل أموال أو بيانات ولم يتغير الرصيد.</Text>
-              {receipt ? (
-                <View style={styles.receiptRows}>
-                  <ReceiptRow label="نوع العملية" value={receipt.kind} />
-                  <ReceiptRow label="الخدمة" value={receipt.service} />
-                  <ReceiptRow label="المستلم / الحساب" value={receipt.target} />
-                  <ReceiptRow label="المبلغ الافتراضي" value={`${receipt.amount.toLocaleString("ar-EG", { minimumFractionDigits: 2 })} ج.م`} />
-                  <ReceiptRow label="مرجع محلي" value={receipt.id} />
-                  <ReceiptRow label="الحالة" value="محاكاة فقط — لا يوجد دفع" />
+              <View ref={receiptImageRef} collapsable={false} style={styles.receiptShareCard}>
+                <View style={styles.receiptShareBrandRow}>
+                  <Text style={styles.receiptShareBrand}>TAHWELATY</Text>
+                  <Text style={styles.receiptShareArabic}>تحويلاتي</Text>
                 </View>
-              ) : null}
+                <Text style={styles.receiptShareStamp}>تجريبي — غير صالح كإثبات دفع</Text>
+                <Text accessibilityRole="header" style={styles.modalTitle}>لم يتم تنفيذ أي معاملة</Text>
+                <Text style={styles.modalCopy}>إيصال محاكاة فقط. لم تُرسل أموال أو بيانات ولم يتغير الرصيد.</Text>
+                {receipt ? (
+                  <View style={styles.receiptRows}>
+                    <ReceiptRow label="نوع العملية" value={receipt.kind} />
+                    <ReceiptRow label="الخدمة" value={receipt.service} />
+                    <ReceiptRow label="المستلم / الحساب" value={receipt.target} ltr />
+                    <ReceiptRow label="المبلغ الافتراضي" value={`${receipt.amount.toLocaleString("ar-EG", { minimumFractionDigits: 2 })} ج.م`} />
+                    <ReceiptRow label="مرجع محلي" value={receipt.id} ltr />
+                    <ReceiptRow label="الحالة" value="محاكاة فقط — لا يوجد دفع" />
+                  </View>
+                ) : null}
+                <Text style={styles.receiptShareFootnote}>لم يتم سداد فاتورة أو تحويل أموال. هذه الصورة ليست إثبات دفع.</Text>
+              </View>
+              <ActionButton title={receiptShareBusy ? "جارٍ تجهيز الصورة…" : "مشاركة الإيصال كصورة"} onPress={shareReceiptImage} disabled={receiptShareBusy} />
               <ActionButton title="إغلاق الإيصال التجريبي" icon="close-outline" onPress={() => setReceipt(null)} />
             </Panel>
           </ScrollView>
@@ -393,11 +428,11 @@ export default function HomeScreen() {
   );
 }
 
-function ReceiptRow({ label, value }: { label: string; value: string }) {
+function ReceiptRow({ label, value, ltr = false }: { label: string; value: string; ltr?: boolean }) {
   return (
     <View style={styles.receiptRow}>
       <Text style={styles.receiptLabel}>{label}</Text>
-      <Text style={styles.receiptValue}>{value}</Text>
+      <Text style={[styles.receiptValue, ltr ? styles.receiptValueLtr : null]}>{value}</Text>
     </View>
   );
 }
@@ -479,10 +514,17 @@ const styles = StyleSheet.create({
   pendingText: { color: palette.muted, fontSize: 11, textAlign: "right" },
   pendingAmount: { color: palette.gold, fontSize: 18, fontWeight: "900", textAlign: "right" },
   receiptCheck: { height: 48, width: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: palette.teal, alignSelf: "center" },
+  receiptShareCard: { width: "100%", gap: 12, padding: 16, borderRadius: 17, borderWidth: 1, borderColor: "#DCC47780", backgroundColor: "#08131D" },
+  receiptShareBrandRow: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  receiptShareBrand: { color: palette.gold, fontSize: 13, fontWeight: "900", letterSpacing: 1 },
+  receiptShareArabic: { color: palette.muted, fontSize: 11, fontWeight: "700" },
+  receiptShareStamp: { color: "#FFC0C5", backgroundColor: "#3B2028", borderColor: "#8B4650", borderWidth: 1, borderStyle: "dashed", borderRadius: 11, padding: 10, textAlign: "center", fontSize: 12, fontWeight: "900" },
+  receiptShareFootnote: { color: palette.subtle, fontSize: 10, lineHeight: 17, textAlign: "center", borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 10 },
   receiptRows: { gap: 0, padding: 12, backgroundColor: palette.surface, borderRadius: 15, borderWidth: 1, borderColor: palette.border },
   receiptRow: { minHeight: 40, flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: 12, borderBottomWidth: 1, borderBottomColor: "#1A2D3B", paddingVertical: 7 },
   receiptLabel: { color: palette.muted, fontSize: 10, flex: 1, textAlign: "right" },
   receiptValue: { color: palette.text, fontSize: 11, fontWeight: "800", flex: 1.5, textAlign: "left" },
+  receiptValueLtr: { writingDirection: "ltr" },
   splash: { ...StyleSheet.absoluteFill, zIndex: 100, alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: "#030913" },
   splashGlowTop: { position: "absolute", width: 320, height: 320, borderRadius: 160, top: "12%", backgroundColor: "#2D93701C" },
   splashGlowBottom: { position: "absolute", width: 260, height: 260, borderRadius: 130, bottom: "8%", right: "-20%", backgroundColor: "#B48D3B14" },

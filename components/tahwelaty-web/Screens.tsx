@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import {
   billCategories,
   billers,
@@ -11,6 +11,7 @@ import {
   type TabId,
 } from "@/components/tahwelaty/data";
 import { ActionButton, Field, Icon, InlineNotice, Panel, Pill, ScreenHeading, TextAreaField, type WebIconName } from "./ui";
+import { shareReceiptPng } from "./share-receipt";
 
 const formatMoney = (amount: number) => amount.toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -318,16 +319,38 @@ export function PinDialog({ mode, pendingAction, error, pinInput, newPin, confir
   );
 }
 
-export function ReceiptDialog({ transaction, onClose }: { transaction: DemoTransaction; onClose: () => void }) {
+export function ReceiptDialog({ transaction, onClose, onShowNotice }: { transaction: DemoTransaction; onClose: () => void; onShowNotice: (message: string) => void }) {
+  const receiptRef = useRef<HTMLDivElement>(null);
+  const [sharing, setSharing] = useState(false);
+
+  const handleShare = async () => {
+    if (!receiptRef.current || sharing) return;
+    setSharing(true);
+    try {
+      const result = await shareReceiptPng(receiptRef.current, `TAHWELATY-DEMO-${transaction.id}.png`);
+      if (result === "shared") onShowNotice("تمت مشاركة صورة إيصال محاكاة؛ لا تمثل عملية دفع حقيقية.");
+      else if (result === "downloaded") onShowNotice("تم تنزيل صورة الإيصال التجريبي بصيغة PNG.");
+      else onShowNotice("أُلغيت مشاركة صورة الإيصال.");
+    } catch {
+      onShowNotice("تعذر تجهيز صورة الإيصال. لم تُرسل أموال أو بيانات لأي جهة.");
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
     <div className="tw-modal-backdrop" role="presentation">
       <section className="tw-modal tw-receipt-modal" role="dialog" aria-modal="true" aria-labelledby="tw-receipt-title">
         <div className="tw-modal-top"><span className="tw-modal-icon"><Icon name="receipt-outline" color="var(--gold)" size={24} /></span><button type="button" className="tw-icon-button" onClick={onClose} aria-label="إغلاق الإيصال"><Icon name="close" size={19} /></button></div>
-        <Pill tone="red">إيصال محاكاة — غير صالح للدفع</Pill>
-        <h2 id="tw-receipt-title">معاينة العملية</h2>
-        <p className="tw-receipt-amount">{formatMoney(transaction.amount)} ج.م</p>
-        <dl className="tw-receipt-details"><div><dt>النوع</dt><dd>{transaction.kind}</dd></div><div><dt>الخدمة</dt><dd>{transaction.service}</dd></div><div><dt>المعرف</dt><dd>{transaction.target}</dd></div><div><dt>المرجع</dt><dd>{transaction.id}</dd></div><div><dt>التاريخ</dt><dd>{transaction.date}</dd></div><div><dt>الحالة</dt><dd><Pill tone="muted">تجريبي — لم يتم الدفع</Pill></dd></div></dl>
-        <InlineNotice tone="warning">لم تُرسل أموال ولم يتم دفع أي فاتورة. لا تستخدم هذا الإيصال لإثبات عملية حقيقية.</InlineNotice>
+        <div className="tw-receipt-share-card" ref={receiptRef} dir="rtl">
+          <div className="tw-receipt-share-brand"><strong>TAHWELATY</strong><span>تحويلاتي</span></div>
+          <p className="tw-receipt-share-stamp">تجريبي — غير صالح كإثبات دفع</p>
+          <h2 id="tw-receipt-title">لم يتم تنفيذ أي معاملة</h2>
+          <p className="tw-receipt-amount">{formatMoney(transaction.amount)} ج.م</p>
+          <dl className="tw-receipt-details"><div><dt>النوع</dt><dd>{transaction.kind}</dd></div><div><dt>الخدمة</dt><dd>{transaction.service}</dd></div><div><dt>المعرف</dt><dd><bdi dir="ltr">{transaction.target}</bdi></dd></div><div><dt>المرجع المحلي</dt><dd><bdi dir="ltr">{transaction.id}</bdi></dd></div><div><dt>التاريخ</dt><dd>{transaction.date}</dd></div><div><dt>الحالة</dt><dd>محاكاة فقط — لم يتم الدفع</dd></div></dl>
+          <p className="tw-receipt-share-footnote">لم تُرسل أموال أو بيانات. هذا الإيصال صورة تجريبية وليس دليلًا على سداد فاتورة.</p>
+        </div>
+        <ActionButton title={sharing ? "جارٍ تجهيز الصورة…" : "مشاركة الإيصال كصورة"} onClick={handleShare} disabled={sharing} />
         <ActionButton title="إغلاق" onClick={onClose} />
       </section>
     </div>

@@ -19,6 +19,7 @@ import {
   BillsScreen,
 } from "./Screens";
 import { ActionButton, Icon, InlineNotice, Pill } from "./ui";
+import { publicAssetPath, publicBaseScope } from "./paths";
 
 const navItems: { id: Exclude<TabId, "support" | "fees">; title: string; icon: "home-outline" | "swap-horizontal-outline" | "receipt-outline" | "shield-checkmark-outline" | "grid-outline" }[] = [
   { id: "home", title: "الرئيسية", icon: "home-outline" },
@@ -56,7 +57,7 @@ function Splash({ onSkip, reducedMotion }: { onSkip: () => void; reducedMotion: 
   return (
     <div className={`tw-splash ${reducedMotion ? "tw-splash--reduced" : ""}`} role="dialog" aria-label="شاشة بداية تحويلاتي">
       <div className="tw-splash-glow" aria-hidden="true" />
-      <img className="tw-splash-reference" src="/images/tahwelaty-splash-reference.jpg" alt="شاشة TAHWELATY الافتتاحية ذات الشعار الزجاجي الملون" />
+      <img className="tw-splash-reference" src={publicAssetPath("images/tahwelaty-splash-reference.jpg")} alt="شاشة TAHWELATY الافتتاحية ذات الشعار الزجاجي الملون" />
       <p className="tw-splash-note">واجهة تجريبية فقط — لا توجد مدفوعات حقيقية</p>
       <button type="button" className="tw-splash-skip" onClick={onSkip}>تخطي</button>
       <span className="tw-splash-progress" aria-hidden="true"><i /></span>
@@ -132,7 +133,7 @@ export default function TahwelatyWebApp() {
     window.addEventListener("appinstalled", handleInstalled);
 
     if ("serviceWorker" in navigator && (window.location.protocol === "https:" || window.location.hostname === "localhost")) {
-      void navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch(() => undefined);
+      void navigator.serviceWorker.register(publicAssetPath("service-worker.js"), { scope: publicBaseScope() }).catch(() => undefined);
     }
     return () => {
       window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
@@ -219,7 +220,7 @@ export default function TahwelatyWebApp() {
       <a className="tw-skip-link" href="#tw-main">تجاوز إلى المحتوى</a>
       <div className="tw-top-disclaimer"><Icon name="information-circle-outline" size={16} /><span>نسخة تجريبية — لا تحويلات أو مدفوعات حقيقية</span></div>
       <header className="tw-header">
-        <div className="tw-brand"><img src="/icons/pwa-192.png" alt="" width="45" height="45" /><span><strong>TAHWELATY</strong><small>{titleFor[activeTab]}</small></span></div>
+        <div className="tw-brand"><img src={publicAssetPath("icons/pwa-192.png")} alt="" width="45" height="45" /><span><strong>TAHWELATY</strong><small>{titleFor[activeTab]}</small></span></div>
         <nav className="tw-desktop-nav" aria-label="التنقل الرئيسي">{navItems.map((item) => <button key={item.id} type="button" className={selectedNav === item.id ? "is-active" : ""} onClick={() => navigate(item.id)} aria-current={selectedNav === item.id ? "page" : undefined}><Icon name={item.icon} size={17} /><span>{item.title}</span></button>)}</nav>
         <div className="tw-header-actions"><Pill tone="red">تجريبي</Pill><ActionButton title={standalone ? "مثبت على الجهاز" : "إضافة للشاشة"} icon="download-outline" variant="secondary" onClick={install} className="tw-install-button" aria-label="إضافة TAHWELATY إلى الشاشة الرئيسية" /></div>
       </header>
@@ -238,7 +239,7 @@ export default function TahwelatyWebApp() {
 
       {splashVisible ? <Splash onSkip={() => setSplashVisible(false)} reducedMotion={reducedMotion} /> : null}
       {pinMode ? <PinDialog mode={pinMode} pendingAction={pendingAction} error={pinError} pinInput={pinInput} newPin={newPin} confirmPin={confirmPin} onPinInput={setPinInput} onNewPin={(value) => { setNewPin(value); setPinError(""); }} onConfirmPin={(value) => { setConfirmPin(value); setPinError(""); }} onSave={saveDemoPin} onVerify={verifyDemoPin} onClose={closePinDialog} onShowNotice={showNotice} /> : null}
-      {receipt ? <ReceiptDialog transaction={receipt} onClose={() => setReceipt(null)} /> : null}
+      {receipt ? <ReceiptDialog transaction={receipt} onClose={() => setReceipt(null)} onShowNotice={showNotice} /> : null}
       {installHelpOpen ? <InstallHelpDialog isIOS={isIOS} isAndroid={isAndroid} onClose={() => setInstallHelpOpen(false)} /> : null}
     </div>
   );
